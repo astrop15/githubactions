@@ -29,15 +29,10 @@ jobs:
 
   build:
     needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v5
-        with:
-          context: ./devops-app
-          push: false
-          tags: devops-app:${{ github.sha }}
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      image-name: devops-app
+      context: ./devops-app
 
   security:
     needs: build
@@ -53,10 +48,16 @@ jobs:
           exit-code: '1'
           format: 'table'
 
-  deploy:
+  deploy-staging:
     needs: [build, security]
-    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - run: echo "Deploying to staging..."
+
+  deploy-production:
+    needs: deploy-staging
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - run: echo "Deploying version ${{ github.sha }}..."
+      - run: echo "Deploying to production..."
