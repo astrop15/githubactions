@@ -25,7 +25,17 @@ jobs:
         run: cd devops-app && npm ci
 
       - name: Run tests
-        run: cd devops-app && npm test
+        run: |
+          cd devops-app
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
+
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-output-node-${{ matrix.node-version }}
+          path: devops-app/test-output.txt
 
   build:
     needs: test
@@ -39,8 +49,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup shared DevOps tools
+        uses: ./.github/actions/setup-tools
+        with:
+          install-terraform: 'false'
+
       - name: Scan application files
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'fs'
           scan-ref: 'devops-app/'
@@ -53,6 +69,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
+      - name: Use secrets safely
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Secrets are masked in logs"
+          echo "DB_PASSWORD length: ${#DB_PASSWORD}"
+          echo "API_KEY length: ${#API_KEY}"
       - run: echo "Deploying to staging..."
 
   deploy-production:
